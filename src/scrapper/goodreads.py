@@ -80,6 +80,7 @@ def get_genres() -> List[Dict[str, Union[str, int]]]:
 def get_books(genre: str, min_sleep: float=0.5, max_sleep: float=1.5) -> List[Dict[str, Any]]:
     URL = "shelf/show/{genre}?page={page}"
     page = 1 
+    books = []
 
     url = ROOT_URL + URL.format(genre=genre, page=page)
     html = requests.get(url).content
@@ -92,6 +93,9 @@ def get_books(genre: str, min_sleep: float=0.5, max_sleep: float=1.5) -> List[Di
         all_books = data.select('div[class=leftContainer] > div[class=elementList]')
         for book in all_books:
             url_extension = book.find("a", {"class":"bookTitle"})['href']
+            book_url = ROOT_URL + url_extension
+            book_info = get_book_info(book_url)
+            books.append(book_info)
 
             max_number_books -= 1
         
@@ -102,3 +106,5 @@ def get_books(genre: str, min_sleep: float=0.5, max_sleep: float=1.5) -> List[Di
         url = ROOT_URL + URL.format(genre=genre, page=page)
         html = requests.get(url).content
         data = BeautifulSoup(html, 'html.parser')
+
+    return books
