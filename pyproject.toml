@@ -8,6 +8,7 @@ authors = ["Samuel Arcadinho <ssam_dav@hotmail.com>"]
 python = "^3.9"
 beautifulsoup4 = "^4.10.0"
 datasets = "^2.0.0"
+ipykernel = "^6.12.1"
 
 [tool.poetry.dev-dependencies]
 

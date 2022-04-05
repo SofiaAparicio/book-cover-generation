@@ -1,9 +1,12 @@
 import re
-from tkinter import image_names
 from typing import Any, Dict, List, Union
 from bs4 import BeautifulSoup
 
 import requests
+import time
+import random
+
+ROOT_URL = 'https://www.goodreads.com/'
 
 
 def get_book_info(url: str) -> Dict[str, Any]:
@@ -49,13 +52,13 @@ def get_genres() -> List[Dict[str, Union[str, int]]]:
     Returns:
         List[Dict[str, Union[str, int]]]: List of book genres and number of books.
     """    
-    URL = "https://www.goodreads.com/genres/list?page={page}"
+    URL = "genres/list?page={page}"
     number_regex = re.compile(r'\d+[,\d{3}]*')
     genre_list = []
 
     next_url = "1" 
     while "next" not in  next_url:
-        url = URL.format(page=next_url)
+        url = ROOT_URL + URL.format(page=next_url)
         html = requests.get(url).content
         data = BeautifulSoup(html, 'html.parser')
         parent = data.find("body").find_all("div", {"class": "shelfStat"})
@@ -72,3 +75,30 @@ def get_genres() -> List[Dict[str, Union[str, int]]]:
         next_url = data.find("em", {"class": "current"}).findNext().string
 
     return genre_list
+
+
+def get_books(genre: str, min_sleep: float=0.5, max_sleep: float=1.5) -> List[Dict[str, Any]]:
+    URL = "shelf/show/{genre}?page={page}"
+    page = 1 
+
+    url = ROOT_URL + URL.format(genre=genre, page=page)
+    html = requests.get(url).content
+    data = BeautifulSoup(html, 'html.parser')
+
+    number_books = data.select_one('div[class=leftContainer] > div[class=mediumText] > span[class=smallText]').string
+    max_number_books = int(re.search(r'Showing \d{1,3}-\d{1,3} of (\d+(,\d+)?)', number_books).group(1).replace(',',''))
+
+    while max_number_books > 0:
+        all_books = data.select('div[class=leftContainer] > div[class=elementList]')
+        for book in all_books:
+            url_extension = book.find("a", {"class":"bookTitle"})['href']
+
+            max_number_books -= 1
+        
+        sleep = random.uniform(min_sleep, max_sleep)
+        time.sleep(sleep)
+        
+        page += 1
+        url = ROOT_URL + URL.format(genre=genre, page=page)
+        html = requests.get(url).content
+        data = BeautifulSoup(html, 'html.parser')
