@@ -1,7 +1,7 @@
 import sys
 import re
 from multiprocessing import Pool
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 from bs4 import BeautifulSoup
@@ -98,14 +98,15 @@ def get_genres() -> List[Dict[str, Union[str, int]]]:
     return genre_list
 
 
-def get_books(genre: str) -> List[str]:
+def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
     """Get books links for a given genre.
 
     Args:
         genre (str): Book genre.
+        max_books (Optional[int], optional): Maximum number of books. Defaults to None.
 
     Returns:
-        List[str]: Book URLs.
+        List[str]: List of book URLs.
     """    
     URL = "shelf/show/{genre}?page={page}"
     page = 1 
@@ -117,6 +118,8 @@ def get_books(genre: str) -> List[str]:
 
     number_books = data.select_one('div[class=leftContainer] > div[class=mediumText] > span[class=smallText]').string
     max_number_books = int(re.search(r'Showing \d{1,3}-\d{1,3} of (\d+(,\d+)?)', number_books).group(1).replace(',',''))
+    if max_books is not None:
+        max_number_books = min(max_number_books, max_books)
 
     pbar = tqdm(total=max_number_books, desc=f"Scrapping {genre} books links", leave=False)
 
@@ -128,6 +131,8 @@ def get_books(genre: str) -> List[str]:
             books.append(book_url)
             max_number_books -= 1
             pbar.update(1)
+            if max_number_books == 0:
+                break
         
         page += 1
         url = ROOT_URL + URL.format(genre=genre, page=page)
