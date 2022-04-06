@@ -142,19 +142,19 @@ def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
     return books
 
 
-def scrapp_books_multiprocess(genre: str, num_proc: int = 10) -> List[Dict[str, Any]]:
+def scrapp_books_multiprocess(genre: str, num_threads: int = 10) -> List[Dict[str, Any]]:
     """Scraps all the books from one genre using multiprocessing.
 
     Args:
         genre (str): Book genre to be scrapped.
-        num_proc (int, optional): Numeber of processores to be used. Defaults to 10.
+        num_threads (int, optional): Numeber of threads to be used. Defaults to 10.
 
     Returns:
         List[Dict[str, Any]]: Book information.
     """    
     book_links = get_books(genre)
     
-    with ThreadPoolExecutor(max_workers=num_proc) as executor:
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
         books_info = list(tqdm(executor.map(get_book_info, book_links), total=len(book_links), desc= f'Scrapping {genre} books', leave=False))
 
     return books_info
