@@ -10,7 +10,9 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT_URL = 'https://www.goodreads.com/'
-        
+MIN_NUM_BOOKS = 5000000
+MIN_NUMB_RATINGS = 10000
+
 
 def get_book_info(url: str) -> Dict[str, Any]:
     """Extract information from Book.
@@ -128,6 +130,9 @@ def get_books_links(genre: str, visited_links: Set[str]=set(), max_books: Option
     while max_number_books > 0:
         all_books = data.select('div[class=leftContainer] > div[class=elementList]')
         for book in all_books:
+            numb_ratings = int(book.find("span", {"class":"smallText"}).string.split("ratings")[0].split()[-1].replace(",", ""))
+            if numb_ratings > MIN_NUMB_RATINGS:
+                continue
             url_extension = book.find("a", {"class":"bookTitle"})['href']
             book_url = ROOT_URL + re.sub(r'^/', '', url_extension)
             if book_url not in visited_links: 
@@ -135,6 +140,7 @@ def get_books_links(genre: str, visited_links: Set[str]=set(), max_books: Option
 
             max_number_books -= 1
             pbar.update(1)
+            # ToDo (to Sam): Why is this condition needed?
             if max_number_books == 0:
                 break
         
@@ -163,3 +169,19 @@ def scrapp_books_multiprocess(genre: str, visited_links: Set[str]=set(), num_thr
         books_info = list(tqdm(executor.map(get_book_info, book_links), total=len(book_links), desc= f'Scrapping {genre} books', leave=False))
 
     return books_info, visited_links
+
+def main():
+
+    # Get all the genders from Goodreads
+    all_genders = get_genres()
+
+    # Select only the genders with a number of books superior than MIN_NUM_BOOKS
+    selected_genres = [genre for genre in all_genders if genre["num_books"] > MIN_NUM_BOOKS]
+    
+    # Get every book of each genre
+    for genre in selected_genres:
+        get_books(genre["genre"], 3)
+
+
+if __name__ == "__main__":
+    main()
