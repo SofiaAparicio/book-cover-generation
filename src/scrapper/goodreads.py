@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Set, Union
 from pathlib import Path
 
 import requests
+import urllib.request
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,12 @@ ROOT_URL = 'https://www.goodreads.com/'
 MIN_NUM_BOOKS = 5000000
 MIN_NUMB_RATINGS = 10000
 MAX_NUM_BOOKS = 10000
+
+
+def get_image(url: str) -> None:
+    file_name = url.split("/")[-1]
+    urllib.request.urlretrieve(url, f"././{file_name}")
+    return True
 
 
 def save_books(books: List[Dict[str, Any]], genre: str, save_dir: Optional[str] = None):
