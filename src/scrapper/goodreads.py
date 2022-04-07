@@ -193,7 +193,7 @@ def main():
     
     # Get every book of each genre
     for genre in tqdm(selected_genres):
-        books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=8)
+        books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=16)
         save_books(books_info, genre=genre["genre"])
 
 if __name__ == "__main__":
