@@ -175,7 +175,7 @@ def main():
     
     # Get every book of each genre
     for genre in selected_genres:
-        get_books(genre["genre"], 3)
+        scrapp_books_multiprocess(genre["genre"], 3)
 
 
 if __name__ == "__main__":
