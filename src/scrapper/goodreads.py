@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Set, Union
 from pathlib import Path
 
 import requests
+import urllib.request
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
@@ -13,6 +14,12 @@ ROOT_URL = 'https://www.goodreads.com/'
 MIN_NUM_BOOKS = 5000000
 MIN_NUMB_RATINGS = 10000
 MAX_NUM_BOOKS = 10000
+
+
+def get_image(url: str) -> None:
+    file_name = url.split("/")[-1]
+    urllib.request.urlretrieve(url, f"././{file_name}")
+    return True
 
 
 def save_books(books: List[Dict[str, Any]], genre: str, save_dir: Optional[str] = None):
@@ -185,15 +192,9 @@ def main():
     selected_genres = [genre for genre in all_genders if genre["num_books"] > MIN_NUM_BOOKS]
     
     # Get every book of each genre
-<<<<<<< HEAD
-    for genre in selected_genres:
-        scrapp_books_multiprocess(genre["genre"], 3)
-
-=======
     for genre in tqdm(selected_genres):
         books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=8)
         save_books(books_info, genre=genre["genre"])
->>>>>>> c86cd7e511e3d2d19fc836928f11e171318afdcf
 
 if __name__ == "__main__":
     main()
