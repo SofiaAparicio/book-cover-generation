@@ -1,7 +1,8 @@
 import sys
 import re
 from multiprocessing import Pool
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -9,7 +10,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT_URL = 'https://www.goodreads.com/'
-
+        
 
 def get_book_info(url: str) -> Dict[str, Any]:
     """Extract information from Book.
@@ -98,11 +99,12 @@ def get_genres() -> List[Dict[str, Union[str, int]]]:
     return genre_list
 
 
-def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
+def get_books_links(genre: str, visited_links: Set[str]=set(), max_books: Optional[int]=None) -> List[str]:
     """Get books links for a given genre.
 
     Args:
         genre (str): Book genre.
+        visited_links (Set[str]): Set with the visited links.
         max_books (Optional[int], optional): Maximum number of books. Defaults to None.
 
     Returns:
@@ -128,7 +130,9 @@ def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
         for book in all_books:
             url_extension = book.find("a", {"class":"bookTitle"})['href']
             book_url = ROOT_URL + re.sub(r'^/', '', url_extension)
-            books.append(book_url)
+            if book_url not in visited_links: 
+                books.append(book_url)
+
             max_number_books -= 1
             pbar.update(1)
             if max_number_books == 0:
@@ -142,19 +146,20 @@ def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
     return books
 
 
-def scrapp_books_multiprocess(genre: str, num_threads: int = 10) -> List[Dict[str, Any]]:
+def scrapp_books_multiprocess(genre: str, visited_links: Set[str]=set(), num_threads: int = 10) -> List[Dict[str, Any]]:
     """Scraps all the books from one genre using multiprocessing.
 
     Args:
         genre (str): Book genre to be scrapped.
+        visited_links (Set[str]): Set with the visited links.
         num_threads (int, optional): Numeber of threads to be used. Defaults to 10.
 
     Returns:
         List[Dict[str, Any]]: Book information.
     """    
-    book_links = get_books(genre)
-    
+    book_links = get_books_links(genre)
+    visited_links |= set(book_links)
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         books_info = list(tqdm(executor.map(get_book_info, book_links), total=len(book_links), desc= f'Scrapping {genre} books', leave=False))
 
-    return books_info
+    return books_info, visited_links
