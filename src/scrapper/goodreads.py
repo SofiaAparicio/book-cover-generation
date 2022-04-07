@@ -1,7 +1,8 @@
-import sys
+import json
 import re
 from multiprocessing import Pool
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Set, Union
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
@@ -11,6 +12,13 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT_URL = 'https://www.goodreads.com/'
 MIN_NUM_BOOKS = 5000000
 MIN_NUMB_RATINGS = 10000
+MAX_NUM_BOOKS = 10000
+
+
+def save_books(books: List[Dict[str, Any]], genre: str, save_dir: Optional[str] = None):
+    save_dir = Path(save_dir or './data')
+    with open(save_dir / f'books_{genre}.json', 'w') as fp:
+        json.dump(books, fp)
 
 
 def get_book_info(url: str) -> Dict[str, Any]:
@@ -100,11 +108,12 @@ def get_genres() -> List[Dict[str, Union[str, int]]]:
     return genre_list
 
 
-def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
+def get_books_links(genre: str, visited_links: Set[str]=set(), max_books: Optional[int]=None) -> List[str]:
     """Get books links for a given genre.
 
     Args:
         genre (str): Book genre.
+        visited_links (Set[str]): Set with the visited links.
         max_books (Optional[int], optional): Maximum number of books. Defaults to None.
 
     Returns:
@@ -120,24 +129,23 @@ def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
 
     number_books = data.select_one('div[class=leftContainer] > div[class=mediumText] > span[class=smallText]').string
     max_number_books = int(re.search(r'Showing \d{1,3}-\d{1,3} of (\d+(,\d+)?)', number_books).group(1).replace(',',''))
-    if max_books is not None:
-        max_number_books = min(max_number_books, max_books)
+    max_books = max_books or MAX_NUM_BOOKS
 
     pbar = tqdm(total=max_number_books, desc=f"Scrapping {genre} books links", leave=False)
 
-    while max_number_books > 0:
+    while max_number_books > 0 and  len(books) < max_books:
         all_books = data.select('div[class=leftContainer] > div[class=elementList]')
         for book in all_books:
             numb_ratings = int(book.find("span", {"class":"smallText"}).string.split("ratings")[0].split()[-1].replace(",", ""))
             if numb_ratings > MIN_NUMB_RATINGS:
-                continue
-            url_extension = book.find("a", {"class":"bookTitle"})['href']
-            book_url = ROOT_URL + re.sub(r'^/', '', url_extension)
-            books.append(book_url)
+                url_extension = book.find("a", {"class":"bookTitle"})['href']
+                book_url = ROOT_URL + re.sub(r'^/', '', url_extension)
+                if book_url not in visited_links: 
+                    books.append(book_url)
+
             max_number_books -= 1
             pbar.update(1)
-            # ToDo (to Sam): Why is this condition needed?
-            if max_number_books == 0:
+            if len(books) > max_books:
                 break
         
         page += 1
@@ -148,24 +156,27 @@ def get_books(genre: str, max_books: Optional[int]=None) -> List[str]:
     return books
 
 
-def scrapp_books_multiprocess(genre: str, num_threads: int = 10) -> List[Dict[str, Any]]:
+def scrapp_books_multiprocess(genre: str, visited_links: Set[str]=set(), num_threads: int = 10) -> List[Dict[str, Any]]:
     """Scraps all the books from one genre using multiprocessing.
 
     Args:
         genre (str): Book genre to be scrapped.
+        visited_links (Set[str]): Set with the visited links.
         num_threads (int, optional): Numeber of threads to be used. Defaults to 10.
 
     Returns:
         List[Dict[str, Any]]: Book information.
     """    
-    book_links = get_books(genre)
-    
+    book_links = get_books_links(genre)
+    visited_links |= set(book_links)
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
         books_info = list(tqdm(executor.map(get_book_info, book_links), total=len(book_links), desc= f'Scrapping {genre} books', leave=False))
 
-    return books_info
+    return books_info, visited_links
 
 def main():
+
+    visited_links = set()
 
     # Get all the genders from Goodreads
     all_genders = get_genres()
@@ -174,9 +185,15 @@ def main():
     selected_genres = [genre for genre in all_genders if genre["num_books"] > MIN_NUM_BOOKS]
     
     # Get every book of each genre
+<<<<<<< HEAD
     for genre in selected_genres:
         scrapp_books_multiprocess(genre["genre"], 3)
 
+=======
+    for genre in tqdm(selected_genres):
+        books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=8)
+        save_books(books_info, genre=genre["genre"])
+>>>>>>> c86cd7e511e3d2d19fc836928f11e171318afdcf
 
 if __name__ == "__main__":
     main()
