@@ -35,9 +35,10 @@ def get_book_info(url: str) -> Dict[str, Any]:
 
     title, author = None, None
     title_author = soup.find('title')
-    title_author = title_author.string.split(' by ')
-    title = title_author[0].strip()
-    if len(title_author) > 1: author = title_author[1].strip()
+    if title_author:
+        title_author = title_author.string.split(' by ')
+        title = title_author[0].strip()
+        if len(title_author) > 1: author = title_author[1].strip()
 
     image_url = soup.find('meta', property='og:image')
     if image_url is not None: image_url = image_url['content']
