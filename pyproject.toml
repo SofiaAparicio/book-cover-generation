@@ -10,6 +10,9 @@ beautifulsoup4 = "^4.10.0"
 datasets = "^2.0.0"
 ipykernel = "^6.12.1"
 tqdm = "^4.64.0"
+plotly = "^5.7.0"
+plotly-express = "^0.4.1"
+matplotlib = "^3.5.1"
 
 [tool.poetry.dev-dependencies]
 
