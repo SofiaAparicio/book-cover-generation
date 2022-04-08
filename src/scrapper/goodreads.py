@@ -1,6 +1,8 @@
 import json
 import re
+import random
 from multiprocessing import Pool
+from time import sleep
 from typing import Any, Dict, List, Optional, Set, Union
 from pathlib import Path
 
@@ -10,7 +12,7 @@ from bs4 import BeautifulSoup
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
-ROOT_URL = 'https://www.goodreads.com/'
+ROOT_URL = 'http://www.goodreads.com/'
 MIN_NUM_BOOKS = 5000000
 MIN_NUMB_RATINGS = 10000
 MAX_NUM_BOOKS = 10000
@@ -24,6 +26,7 @@ def get_image(url: str) -> None:
 
 def save_books(books: List[Dict[str, Any]], genre: str, save_dir: Optional[str] = None):
     save_dir = Path(save_dir or './data')
+    if not save_dir.exists(): save_dir.mkdir()
     with open(save_dir / f'books_{genre}.json', 'w') as fp:
         json.dump(books, fp)
 
@@ -37,6 +40,7 @@ def get_book_info(url: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Extracted information.
     """   
+    sleep(10)
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -144,7 +148,10 @@ def get_books_links(genre: str, visited_links: Set[str]=set(), max_books: Option
     while max_number_books > 0 and  len(books) < max_books:
         all_books = data.select('div[class=leftContainer] > div[class=elementList]')
         for book in all_books:
-            numb_ratings = int(book.find("span", {"class":"smallText"}).string.split("ratings")[0].split()[-1].replace(",", ""))
+            try:
+                numb_ratings = int(book.find("span", {"class":"smallText"}).string.split("ratings")[0].split()[-1].replace(",", ""))
+            except ValueError:
+                continue
             if numb_ratings > MIN_NUMB_RATINGS:
                 url_extension = book.find("a", {"class":"bookTitle"})['href']
                 book_url = ROOT_URL + re.sub(r'^/', '', url_extension)
@@ -158,6 +165,7 @@ def get_books_links(genre: str, visited_links: Set[str]=set(), max_books: Option
         
         page += 1
         url = ROOT_URL + URL.format(genre=genre, page=page)
+        sleep(1)
         html = requests.get(url).content
         data = BeautifulSoup(html, 'html.parser')
 
@@ -184,7 +192,7 @@ def scrapp_books_multiprocess(genre: str, visited_links: Set[str]=set(), num_thr
 
 def main():
 
-    visited_links = set()
+    visited_links, all_links = set(), []
 
     # Get all the genders from Goodreads
     all_genders = get_genres()
@@ -194,8 +202,10 @@ def main():
     
     # Get every book of each genre
     for genre in tqdm(selected_genres):
-        books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=16)
-        save_books(books_info, genre=genre["genre"])
+        book_links = get_books_links(genre["genre"], visited_links=visited_links)
+        visited_links |= set(book_links)
+        #books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=16)
+        save_books(book_links, genre='links_'+genre["genre"])
 
 if __name__ == "__main__":
     main()
