@@ -1,6 +1,8 @@
 import json
+import pathlib
 import re
-import random
+import os
+from os import walk
 from multiprocessing import Pool
 from time import sleep
 from typing import Any, Dict, List, Optional, Set, Union
@@ -40,7 +42,7 @@ def get_book_info(url: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: Extracted information.
     """   
-    sleep(10)
+    sleep(5)
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -190,22 +192,84 @@ def scrapp_books_multiprocess(genre: str, visited_links: Set[str]=set(), num_thr
 
     return books_info, visited_links
 
+
 def main():
 
-    visited_links, all_links = set(), []
+    # visited_links, all_links = set(), []
 
-    # Get all the genders from Goodreads
-    all_genders = get_genres()
+    # # Get all the genders from Goodreads
+    # all_genders = get_genres()
 
-    # Select only the genders with a number of books superior than MIN_NUM_BOOKS
-    selected_genres = [genre for genre in all_genders if genre["num_books"] > MIN_NUM_BOOKS]
+    # # Select only the genders with a number of books superior than MIN_NUM_BOOKS
+    # selected_genres = [genre for genre in all_genders if genre["num_books"] > MIN_NUM_BOOKS]
     
-    # Get every book of each genre
-    for genre in tqdm(selected_genres):
-        book_links = get_books_links(genre["genre"], visited_links=visited_links)
-        visited_links |= set(book_links)
-        #books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=16)
-        save_books(book_links, genre='links_'+genre["genre"])
+
+    # Get the current working directory
+    directory = os.getcwd()
+    index = directory.find("book-cover-generation") + len("book-cover-generation") +1
+
+    # Extract all files under the data directory
+    data_path = directory[:index]+"/data/"
+    filenames = next(walk(data_path), (None, None, []))[2] 
+
+    # # Get list of names of categories already visited
+    # all_visited_categories = {filename.split(".")[0].split("_")[-1]:filename for filename in filenames}
+    
+    # # Get the URL of every book of each genre
+    # for genre in tqdm(selected_genres):
+    #     if genre["genre"] in list(all_visited_categories.keys()):
+    #         continue
+    #     book_links = get_books_links(genre["genre"], visited_links=visited_links)
+    #     visited_links |= set(book_links)
+    #     #books_info, visited_links = scrapp_books_multiprocess(genre=genre["genre"], visited_links=visited_links, num_threads=16)
+    #     save_books(book_links, genre='links_'+genre["genre"])
+    
+    # Get every book by the URL
+    fileFormat = r'books_links_*.json'
+    all_visited_categories = list(pathlib.Path(data_path).glob(fileFormat))
+
+    for file_path in tqdm(all_visited_categories):
+        with open(file_path, 'r') as f:
+            book_urls = json.load(f)
+
+        genre = re.match(r'books_links_(\S+).json', file_path.name).group(1) 
+        max_workers = 100
+        books_info = []
+
+        for idx in tqdm(list(range(0,len(book_urls), max_workers)),desc=f'Getting {genre} books', leave=False):
+            links_from_file = book_urls[idx:idx+max_workers]
+            previous_down_books = dict()
+
+            # See what are the urls that we still need to download
+            try:
+                with open(data_path+"books_info_"+genre+".json", 'r') as f:
+                    previous_down_books = json.load(f)
+                f.close()
+                links = [l for l in links_from_file if l not in list(previous_down_books.keys())]
+                if len(previous_down_books) >= MAX_NUM_BOOKS:
+                    print(f"All set with {genre} genre! ^.^")
+                    break
+
+            except FileNotFoundError:
+                links = links_from_file
+
+            # Run get_book_info() function in thread
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                books_info = list(executor.map(get_book_info, links))
+                print(books_info)
+                books_info += books_info
+
+            # Save the book info after each max number of thread workers
+            thread_to_save = {links[i]: books_info[i] for i in range(len(links)) if books_info[i]["author"] != None}
+            merg_to_save = thread_to_save | previous_down_books
+            save_books(merg_to_save, genre='info_'+genre)
+
+            # Break if it was not able to download a lot of files
+            if len(thread_to_save) < max_workers and len(links) < 99:
+                print("deu_merda")
+                break
+        
+                
 
 if __name__ == "__main__":
     main()
